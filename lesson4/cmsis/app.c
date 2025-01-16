@@ -27,7 +27,8 @@ int main(void) {
 void setup() {
     //LED PC13
     RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
-    GPIOC->CRH = GPIO_CRH_CNF13_0 | GPIO_CRH_MODE13_1;
+    GPIOC->CRH &= ~GPIO_CRH_CNF13_0;
+    GPIOC->CRH |= GPIO_CRH_MODE13_1;
 }
 
 void enable() {
