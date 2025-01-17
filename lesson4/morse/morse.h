@@ -9,8 +9,8 @@ typedef struct {
     void (*disable)(void);
 
     void (*wait)(uint8_t interval);
-} MorsePrinter_i;
+} MorseManager_i;
 
-void echoMorse(const char *message, uint8_t messageSizeLimit, const MorsePrinter_i *printer);
+void echoMorse(const char *message, uint8_t messageSizeLimit, const MorseManager_i *manager);
 
 #endif

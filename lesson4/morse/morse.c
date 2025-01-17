@@ -3,14 +3,14 @@
 
 #define BASE_DELAY 1
 #define DOT_DELAY BASE_DELAY
-#define DASH_DELAY 3
+#define DASH_DELAY 3 * BASE_DELAY
 
-#define SAME_SYMBOL_INTERVAL 1
-#define SYMBOL_INTERVAL 2
-#define WORD_INTERVAL 4
-#define END_INTERVAL 6
+#define SAME_SYMBOL_INTERVAL BASE_DELAY
+#define SYMBOL_INTERVAL 2 * BASE_DELAY
+#define WORD_INTERVAL 4 * BASE_DELAY
+#define END_INTERVAL 6 * BASE_DELAY
 
-#define MAX_SIZE 8
+#define MORSE_SYMBOLS_MAX_BITS 8
 
 //A .-
 #define Sym_a 0b101
@@ -123,56 +123,79 @@
 
 
 uint8_t getMorseForSymbol(const char sym);
-
-void echoMorseSymbol(const char sym, const MorsePrinter_i *printer);
+void echoMorseSymbol(const char sym, const MorseManager_i *printer);
 
 /**
- * char *message null terminated message
+ * @param char *message null нультерминированная строка
+ * @param uint8_t messageSizeLimit - на всякий случай защита, если не нультерминированную строку передают
+ * @param MorseManager_i *manager - ссылка на нашего покорного слугу, который реализует операции вкл, выкл и паузы
  */
-void echoMorse(const char *message, uint8_t messageSizeLimit, const MorsePrinter_i *printer) {
+void echoMorse(const char *message, uint8_t messageSizeLimit, const MorseManager_i *manager) {
     uint8_t i = 0;
+
+    /**
+     * Идем по буквам нашей фразы.
+     */
     while (i < messageSizeLimit && message[i] != '\0') {
         if (message[i] == ' ') {
-            printer->wait(WORD_INTERVAL);
+            /** Встретили пробел, значит слово кончилось */
+            manager->wait(WORD_INTERVAL);
         } else {
-
+            /** для второго и последующих проверяем с предыдущим на совпадение, у них интервал пауз короче */
             if (i && message[i - 1] == message[i]) {
-                printer->wait(SAME_SYMBOL_INTERVAL);
-            } else {
-                printer->wait(SYMBOL_INTERVAL);
+                manager->wait(SAME_SYMBOL_INTERVAL);
+            } else if (i) {
+                /** для первого символа интервал нам не нужен, для остальных перед символом ставим паузу */
+                manager->wait(SYMBOL_INTERVAL);
             }
-
-            echoMorseSymbol(message[i], printer);
+            /** вывод символа */
+            echoMorseSymbol(message[i], manager);
         }
         i++;
     }
-    printer->wait(END_INTERVAL);
+    /** в конце сообщения ставим соотвествующую паузу */
+    manager->wait(END_INTERVAL);
 }
 
-void echoMorseSymbol(const char sym, const MorsePrinter_i *printer) {
+void echoMorseSymbol(const char sym, const MorseManager_i *manager) {
 
     uint8_t code = getMorseForSymbol(sym);
-    uint8_t stack[MAX_SIZE];
-    uint8_t i = MAX_SIZE;
+    uint8_t stack[MORSE_SYMBOLS_MAX_BITS];
+    uint8_t i = MORSE_SYMBOLS_MAX_BITS;
 
+    /**
+     * поскольку биты считаются с конца, сначала положим биты в стек
+     */
     for (;code >> 1; code = code >> 1) {
         stack[--i] = code % 2;
     }
-
-    for (; i < MAX_SIZE; i++) {
-        printer->enable();
-        printer->wait(stack[i] ? DASH_DELAY : DOT_DELAY);
-        printer->disable();
-        printer->wait(BASE_DELAY);
+    
+    for (; i < MORSE_SYMBOLS_MAX_BITS; i++) {
+        /**
+         * включаем, 
+         * затем ждем, в зависимости от того точка это или тире определенный интервал
+         * выключаем
+         */
+        manager->enable();
+        manager->wait(stack[i] ? DASH_DELAY : DOT_DELAY);
+        manager->disable();
+        /**
+         * Интервал пауз между символами точек и тире, 
+         * для последнего не нужно, т.к. там межсимвольный интервал
+         */
+        if (i < MORSE_SYMBOLS_MAX_BITS - 1) {
+            manager->wait(BASE_DELAY);
+        }
     }
 }
 
 /**
+ * Получаем перевод символа в азбуку морзе
  * Попытка сэкономить ресурсы
  * Первый бит является отсечкой(чтобы символы, начинающиеся с точки, также работали),
  * последующие биты 0 - для точки, 1 для тире
- * @param sym
- * @return
+ * @param char sym
+ * @return uint8_t число, по факту в двоичной системе
  */
 uint8_t getMorseForSymbol(const char sym) {
     switch (sym) {

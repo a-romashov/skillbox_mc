@@ -1,26 +1,24 @@
 #include "stm32f10x.h"                  // Device header
 #include "../morse/morse.h"
 
-
+void setup();
 void enable();
 void disable();
 void wait(uint8_t interval);
-void setup();
 
 
 
 int main(void) {
 
-    MorsePrinter_i printer;
-    printer.enable = &enable;
-    printer.disable = &disable;
-    printer.wait = &wait;
+    MorseManager_i manager;
+    manager.disable = &disable;
+    manager.enable = &enable;
+    manager.wait = &wait;
     
     setup();
         
     while(1) {
-        echoMorse("Hello, world!", 16, &printer);
-        wait(10);
+        echoMorse("Hello, World!", 16, &manager);
     }
 }
 
@@ -32,15 +30,15 @@ void setup() {
 }
 
 void enable() {
-    GPIOC->ODR &= ~GPIO_ODR_ODR13;
+    GPIOC->ODR &= ~(GPIO_ODR_ODR13);
 }
 
 void disable() {
     GPIOC->ODR |= GPIO_ODR_ODR13;
 }
 
-void wait(uint8_t interval) {
-    for (int i = 0; i < 300000 * interval;i++);
+void wait(const uint8_t interval) {
+    for (volatile int i = 0; i < (2 << 19) * interval;i++);
 }
 
 
