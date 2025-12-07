@@ -31,7 +31,6 @@ void TIM1_UP_IRQHandler(void) {
             duty = (uint8_t)(duty + STEP * sign);
             if (duty >= 100 || duty <= 0) {
                 sign *= -1;
-                duty = duty > 100 ? 100 : (duty < 0 ? 0 : duty);
             }
         }
 

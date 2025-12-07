@@ -17,7 +17,6 @@ void TIM2_IRQHandler(void) {
         duty = (uint8_t)(duty + sign);
         if (duty >= 100 || duty <= 0) {
             sign *= -1;
-            duty = duty > 100 ? 100 : (duty < 0 ? 0 : duty);
         }
 
         TIM1->CCR1 = duty;
