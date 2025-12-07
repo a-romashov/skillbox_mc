@@ -27,7 +27,6 @@
 *.d
 *.crf
 *.elf
-*.hex
 *.h86
 *.lib
 *.obj
