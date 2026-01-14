@@ -4,10 +4,30 @@
 #define SYS_TICK_FREQ 8000000
 
 
-uint8_t buffer_dma[BUFFER_SIZE];
+uint8_t buffer_dma_rx[BUFFER_SIZE_RX];
 
-uint8_t *getBufferDma(void) {
-    return buffer_dma;
+uint8_t buffer_dma_tx[BUFFER_SIZE_TX];
+
+
+void setupUart1DmaTx(uint8_t count);
+
+uint8_t *getBufferDmaRx(void) {
+    return buffer_dma_rx;
+}
+
+void setBufferDmaTx(char *message) {
+   
+    int count = 0;
+    while(message[count] != '\0' && count < BUFFER_SIZE_TX) {
+        buffer_dma_tx[count] = (uint8_t) message[count];
+        count++;
+    }
+
+    // Хотелось бы конечно заюзать DMA_ChannelReloadCycle, но что-то не пошло,
+    // хотя параметр цикла имеется, есть подозрение, что не меняется конечный адрес памяти
+    // видимо так делать нельзя, поэтому инициализируем все по новой
+    setupUart1DmaTx(count);
+    UART_DMACmd(MDR_UART1, UART_DMA_TXE, ENABLE);
 }
 
 void initSysTick(void) {
@@ -96,30 +116,60 @@ void setupUART1(void) {
 }
 
 
-void setupUart1Dma(void) {
-
-    RST_CLK_PCLKcmd(RST_CLK_PCLK_DMA, ENABLE);//тактирование DMA
-
-    DMA_CtrlDataInitTypeDef ctrl; // Контрольная структура описания приема-передачи DMA
-    ctrl.DMA_SourceBaseAddr = (uint32_t) & MDR_UART1->DR; // источник данных
-    ctrl.DMA_DestBaseAddr = (uint32_t) & buffer_dma; // приемник данных
-    ctrl.DMA_SourceIncSize = DMA_SourceIncNo; // счетчик данных источника (все чтение из DR регистра)
-    ctrl.DMA_DestIncSize = DMA_DestIncByte; // тоже счетчик но для данных приемника
-    ctrl.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte; // размер элемента пакета данных
-    ctrl.DMA_CycleSize = BUFFER_SIZE; // Размер пакета данных в MemoryDataSize
-    ctrl.DMA_NumContinuous = DMA_Transfers_1; //кол-во кусочков переданных за раз
-    ctrl.DMA_SourceProtCtrl = DMA_SourcePrivileged; // уровень доступа к памяти источника
-    ctrl.DMA_DestProtCtrl = DMA_DestPrivileged; // уровень доступа к памяти приемника
-    ctrl.DMA_Mode = DMA_Mode_Basic; // режим тут типа одна передача
+void setupUart1DmaRx(void) {
 
 
+    
+    /**
+     * Канал приема
+     */
+    DMA_CtrlDataInitTypeDef ctrlRx; // Контрольная структура описания приема-передачи DMA
+    ctrlRx.DMA_SourceBaseAddr = (uint32_t) &MDR_UART1->DR; // источник данных
+    ctrlRx.DMA_DestBaseAddr = (uint32_t) &buffer_dma_rx; // приемник данных
+    ctrlRx.DMA_SourceIncSize = DMA_SourceIncNo; // счетчик данных источника (все чтение из DR регистра)
+    ctrlRx.DMA_DestIncSize = DMA_DestIncByte; // тоже счетчик но для данных приемника
+    ctrlRx.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte; // размер элемента пакета данных
+    ctrlRx.DMA_CycleSize = BUFFER_SIZE_RX; // Размер пакета данных в MemoryDataSize
+    ctrlRx.DMA_NumContinuous = DMA_Transfers_1; //кол-во кусочков переданных за раз
+    ctrlRx.DMA_SourceProtCtrl = DMA_SourcePrivileged; // уровень доступа к памяти источника
+    ctrlRx.DMA_DestProtCtrl = DMA_DestPrivileged; // уровень доступа к памяти приемника
+    ctrlRx.DMA_Mode = DMA_Mode_Basic; // режим тут типа одна передача
 
-    DMA_ChannelInitTypeDef channel; // Настройки канала передачи DMA
-    DMA_StructInit(&channel);
-    channel.DMA_PriCtrlData = &ctrl;
-    channel.DMA_ProtCtrl = DMA_AHB_Privileged; // уровень доступа к памяти DMA
 
-    DMA_Init(DMA_Channel_UART1_RX, &channel);
+
+    DMA_ChannelInitTypeDef channelRx; // Настройки канала передачи DMA
+    DMA_StructInit(&channelRx);
+    channelRx.DMA_PriCtrlData = &ctrlRx;
+    channelRx.DMA_ProtCtrl = DMA_AHB_Privileged; // уровень доступа к памяти DMA
+
+    DMA_Init(DMA_Channel_UART1_RX, &channelRx);
+}
+
+void setupUart1DmaTx(uint8_t count) {
+    
+        /**
+     * Канал отправки
+     */
+    DMA_CtrlDataInitTypeDef ctrlTx;
+    ctrlTx.DMA_SourceBaseAddr = (uint32_t) &buffer_dma_tx[0];
+    ctrlTx.DMA_DestBaseAddr = (uint32_t) &MDR_UART1->DR;
+    ctrlTx.DMA_SourceIncSize = DMA_SourceIncByte; 
+    ctrlTx.DMA_DestIncSize = DMA_DestIncNo;
+    ctrlTx.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+    ctrlTx.DMA_CycleSize = count;
+    ctrlTx.DMA_NumContinuous = DMA_Transfers_1;
+    ctrlTx.DMA_SourceProtCtrl = DMA_SourcePrivileged;
+    ctrlTx.DMA_DestProtCtrl = DMA_DestPrivileged;
+    ctrlTx.DMA_Mode = DMA_Mode_Basic;
+
+
+
+    DMA_ChannelInitTypeDef channelTx;
+    DMA_StructInit(&channelTx);
+    channelTx.DMA_PriCtrlData = &ctrlTx;
+    channelTx.DMA_ProtCtrl = DMA_AHB_Privileged;
+    
+    DMA_Init(DMA_Channel_UART1_TX, &channelTx);
 }
 
 void setup(void) {
@@ -129,9 +179,10 @@ void setup(void) {
     //Спасибо челику на хабре, что написал что отключенные SSP1, SSP2 будут ложные прерывания давать..
     RST_CLK_PCLKcmd(RST_CLK_PCLK_SSP1, ENABLE);
     RST_CLK_PCLKcmd(RST_CLK_PCLK_SSP2, ENABLE);
+    RST_CLK_PCLKcmd(RST_CLK_PCLK_DMA, ENABLE);//тактирование DMA
 
     setupUART1();
-    setupUart1Dma();
+    setupUart1DmaRx();
 
     UART_DMACmd(MDR_UART1, UART_DMA_RXE, ENABLE);
     UART_Cmd(MDR_UART1, ENABLE); // Включение UART1

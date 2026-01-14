@@ -46,18 +46,15 @@ void loop(void) {
 }
 
 void waitUartReady(void) {
-    while (UART_GetFlagStatus(MDR_UART1, UART_FLAG_BUSY) == SET);
+    while(DMA_GetFlagStatus(DMA_Channel_UART1_TX, DMA_FLAG_CHNL_ENA) == SET);
 }
 
 void uartStringSend(char *str) {
-    for (uint8_t i = 0; str[i] != '\0'; i++) {
-        waitUartReady();
-        enableLed(); //на передачу включаем лампочку
 
-        UART_SendData(MDR_UART1, str[i]);
-
-        disableLed(); //после передачи выключаем лампочку
-    }
+     enableLed(); //на передачу включаем лампочку
+     setBufferDmaTx(str);
+     waitUartReady();
+     disableLed(); //после передачи выключаем лампочку
 }
 
 
@@ -86,12 +83,12 @@ void DMA_IRQHandler(void) {
     } else if (DMA_GetFlagStatus(DMA_Channel_UART1_RX, DMA_FLAG_CHNL_ENA) == RESET) {
 
         uint8_t toCopyBytes = 0;
-        if (size + BUFFER_SIZE + 1 >= OUTPUT_BUFFER_SIZE) {
+        if (size + BUFFER_SIZE_RX + 1 >= OUTPUT_BUFFER_SIZE) {
             toCopyBytes = OUTPUT_BUFFER_SIZE - size - 1;
         } else {
-            toCopyBytes = BUFFER_SIZE;
+            toCopyBytes = BUFFER_SIZE_RX;
         }
-        uint8_t *dma_buffer = getBufferDma();
+        uint8_t *dma_buffer = getBufferDmaRx();
 
         for (uint8_t i = 0; i < toCopyBytes; i++, size++) {
             buffer[size] = dma_buffer[i];
@@ -109,8 +106,12 @@ void DMA_IRQHandler(void) {
             buffer[size] = '\0';
         }
 
-        DMA_ChannelReloadCycle(DMA_Channel_UART1_RX, DMA_CTRL_DATA_PRIMARY, BUFFER_SIZE, DMA_Mode_Basic);
+        DMA_ChannelReloadCycle(DMA_Channel_UART1_RX, DMA_CTRL_DATA_PRIMARY, BUFFER_SIZE_RX, DMA_Mode_Basic);
         DMA_Cmd(DMA_Channel_UART1_RX, ENABLE);
+        
+    }  else if (DMA_GetFlagStatus(DMA_Channel_UART1_TX, DMA_FLAG_CHNL_ENA) == RESET) {
+        
+        UART_DMACmd(MDR_UART1, UART_DMA_TXE, DISABLE);
     }
 
 }

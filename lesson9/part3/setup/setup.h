@@ -5,7 +5,8 @@
 #define UART_BAUD_RATE 115200
 #endif
 
-#define BUFFER_SIZE 1
+#define BUFFER_SIZE_RX 1
+#define BUFFER_SIZE_TX 1 << 8
 
 #include "K1986VE9xI.h"                 // Device header
 #include "MDR32FxQI_port.h"             // Milandr::Drivers:PORT
@@ -16,6 +17,7 @@
 
 void setup(void);
 
-uint8_t *getBufferDma(void);
+uint8_t *getBufferDmaRx(void);
+void setBufferDmaTx(char *message);
 
 #endif
